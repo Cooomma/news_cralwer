@@ -1,6 +1,8 @@
 from urllib.parse import unquote
 from datetime import datetime
 
+import os
+import redis
 import scrapy
 
 
@@ -21,11 +23,12 @@ class Hk01Spider(scrapy.Spider):
 
     @staticmethod
     def _clean_ts(ts):
+        ts = ts.replace('\t', '').replace('\n', '')
         if '最後更新日期：' in ts:
             ts = ts.replace('最後更新日期：', '')
         if '發佈日期：' in ts:
             ts = ts.replace('發佈日期：', '')
-        return ts
+        return datetime.strptime(ts, '%Y-%m-%d %H:%M')
 
     @staticmethod
     def _get_source(paragraph):
@@ -40,95 +43,92 @@ class Hk01Spider(scrapy.Spider):
     def _zip_tags(tag_ids, tag_names):
         cleaned_tag_ids = [int(id.split('/')[-1])
                            for id in tag_ids if 'javascript' not in id]
-        return list(zip(cleaned_tag_ids, tag_names))
+        return dict(zip(cleaned_tag_ids, tag_names))
 
     def start_requests(self):
-        for artical_id in range(100000, 150000):
+        # TODO: Get last crawler ID
+        r = redis.StrictRedis(host=os.environ['REDIS_HOST'], port=6379, db=0)
+        start_id = int(r.get('HK01_LAST_CRAWL_ID')) - 5
+        end_id = start_id + 5
+
+        for artical_id in range(start_id, end_id):
             url = ARTICAL_URL.format(artical_id)
             yield scrapy.Request(url=url, callback=self.parse)
 
     def parse(self, response):
         try:
-            artical_category = response.url.split('/')[3],
+            channel = unquote(response.url.split('/')[3])
+            artical_id = response.url.split('/')[4]
         except:
-            artical_category = []
+            channel = ''
+            artical_id = 0
 
         try:
-            artical_id = int(response.url.split('/')[4]),
+            title = response.css('div.article_tit h1::text').extract_first().replace(u'\u3000', u'')
         except:
-            artical_id = []
-
-        try:
-            title = response.css('div.article_tit h1::text').extract_first(),
-        except:
-            title = []
-
-        try:
-            channel = response.css('div.channel_tit tit::text').extract_first(),
-        except:
-            channel = []
+            title = ""
 
         try:
             editors = []
             for editor in response.css('div.editor::text').extract():
                 editors.append(editor.replace('撰文：', '').replace('\t', '').replace('\n', ''))
         except:
-            editor = []
+            editors = []
 
         try:
-            release_ts = self._clean_ts(response.css('div.date::text').extract()
-                                        [0].replace('\t', '').replace('\n', '')),
+            ts = response.css('div.date::text').extract()
+            release_ts = self._clean_ts(ts[0])
+            last_updated_ts = self._clean_ts(ts[1])
         except:
-            release_ts = []
+            release_ts = None
+            last_updated_ts = None
 
         try:
-            last_updated_ts = self._clean_ts(response.css('div.date::text').extract()
-                                             [1].replace('\t', '').replace('\n', '')),
+            abstract = response.css('li.article_summary_pt h2::text').extract_first().replace(u'\u3000', u'')
         except:
-            last_updated_ts = []
+            abstract = ''
 
         try:
-            abstract = response.css('li.article_summary_pt h2::text').extract_first().replace(u'\u3000', u''),
-        except:
-            abstract = []
-
-        try:
-            paragraph = '\n'.join(response.selector.xpath(
-                '/html/body/section/div[2]/div[1]/div[1]/section[2]').xpath('.//p/text()').extract()[:-1]),
+            paragraph = '\n'.join(response.css('p::text').extract())
         except:
             paragraph = []
 
         try:
-            tag_ids = self._clean_tag_ids(response.css('div.tag_txt a[href]::attr(href)').extract()),
+            tag_ids = self._clean_tag_ids(response.css('div.tag_txt a[href]::attr(href)').extract())
         except:
             tag_ids = []
 
         try:
-            tag_names = response.css('div.tag_txt h4::text').extract(),
+            tag_names = response.css('div.tag_txt h4::text').extract()
         except:
             tag_names = []
 
         try:
             tags = self._zip_tags(response.css('div.tag_txt a[href]::attr(href)').extract(
-            ), response.css('div.tag_txt h4::text').extract()),
+            ), response.css('div.tag_txt h4::text').extract())
         except:
-            tags = []
+            tags = {}
+
+        try:
+            sources = self._get_source(response.selector.xpath(
+                '/html/body/section/div[2]/div[1]/div[1]/section[2]').xpath('.//p/text()').extract())
+        except:
+            sources = []
 
         item = {
             'url': response.url,
-            'artical_category': unquote(artical_category[0]) if artical_category is not None else "",
-            'artical_id': artical_id[0] if artical_id is not None else 0,
-            'title': title[0] if title is not None else "",
-            'channel': channel[0] if channel is not None else "",
-            'editors': editors if editors is not None else "",
-            'release_ts': datetime.strptime(release_ts[0], '%Y-%m-%d %H:%M') if release_ts is not None else datetime.min,
-            'last_updated_ts': datetime.strptime(last_updated_ts[0], '%Y-%m-%d %H:%M') if last_updated_ts is not None else datetime.min,
-            'abstract': abstract if abstract is not None else "",
-            'paragraph': paragraph[0] if paragraph is not None else "",
-            'tag_ids': tag_ids[0] if tag_ids is not None else [],
-            'tag_names': tag_names[0] if tag_names is not None else "",
-            'tags': tags[0] if tags is not None else [],
-            'spider_ts': datetime.now(),
-            # 'source': self._get_source(response.selector.xpath('/html/body/section/div[2]/div[1]/div[1]/section[2]').xpath('.//p/text()').extract())
+            'article_id': artical_id,
+            'title': title,
+            'channel': channel,
+            'editors': editors,
+            'release_ts': release_ts.strftime('%Y-%m-%d %H:%M'),
+            'last_updated_ts': last_updated_ts.strftime('%Y-%m-%d %H:%M'),
+            'abstract': abstract,
+            'paragraph': paragraph,
+            'tag_ids': tag_ids,
+            'tag_names': tag_names,
+            'tags': tags,
+            'spider_ts': datetime.now().timestamp(),
+            'source': sources
         }
         yield item
