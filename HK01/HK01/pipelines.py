@@ -12,16 +12,19 @@ import json
 
 import boto3
 import redis
+from HK01 import utils
 
 
 class Hk01Pipeline(object):
 
     def __init__(self):
-        self.s3 = boto3.resource('s3')
-        self.redis = redis.StrictRedis(host=os.environ['REDIS_HOST'], port=6379, db=0)
+        # self.s3 = boto3.resource('s3')
+        # self.redis = redis.StrictRedis(host=os.environ['REDIS_HOST'], port=6379, db=0)
+        pass
 
     def open_spider(self, spider):
-        spider.last_id = self.redis.get("HK01_LAST_ID")
+        # spider.last_id = self.redis.get("HK01_LAST_ID")
+        pass
 
     def process_item(self, item, spider):
         self._local_storage(item)
@@ -31,7 +34,8 @@ class Hk01Pipeline(object):
         pass
 
     def _s3fs(self, item):
-        self.redis.set("HK01_LAST_CRAWL_ID", int(item.get("article_id")))
+        # self.redis.set("HK01_LAST_CRAWL_ID", int(item.get("article_id")))
+        '''
         key = "HK01/dt={dt}/{article_id}.json".format_map(
             {'dt': datetime.strptime(item.get('release_ts'), '%Y-%m-%d %H:%M').strftime('%Y-%m-%d'),
              'article_id': item.get('article_id')})
@@ -41,14 +45,16 @@ class Hk01Pipeline(object):
             Key=key,
             StorageClass='STANDARD'
         )
+        '''
+        self._local_storage(item)
 
     def _local_storage(self, item):
         local_dir = "local_fs/HK01/dt={dt}/".format_map(
-            {'dt': datetime.strptime(item.get('release_ts'), '%Y-%m-%d %H:%M').strftime('%Y-%m-%d')})
+            {'dt': utils.ts_to_timestr(item.get('release_ts'))})
         if not os.path.isdir(local_dir):
             os.makedirs(local_dir, mode=0o777)
         local_path = local_dir + "{article_id}.json".format_map(
-            {'dt': datetime.strptime(item.get('release_ts'), '%Y-%m-%d %H:%M').strftime('%Y-%m-%d'),
+            {'dt': utils.ts_to_timestr(item.get('release_ts')),
              'article_id': item.get('article_id')})
         with open(local_path, 'w') as w:
             w.write(json.dumps(item, ensure_ascii=False, sort_keys=True))

@@ -1,10 +1,16 @@
 from urllib.parse import unquote
 from datetime import datetime
+from dateutil import tz
 
 import os
+import time
 import redis
 import scrapy
+from scrapy.loader import ItemLoader
 
+
+from HK01 import utils
+from HK01.items import Hk01Item
 
 ARTICAL_URL = 'https://www.hk01.com/article/{}'
 
@@ -12,124 +18,68 @@ ARTICAL_URL = 'https://www.hk01.com/article/{}'
 class Hk01Spider(scrapy.Spider):
     name = 'HK01'
 
-    @staticmethod
-    def _get_artical_url(artical_id):
-        return ARTICAL_URL.format(artical_id)
-
-    @staticmethod
-    def _clean_tag_ids(tag_ids):
-        return [int(id.split('/')[-1])
-                for id in tag_ids if 'javascript' not in id]
-
-    @staticmethod
-    def _clean_ts(ts):
-        ts = ts.replace('\t', '').replace('\n', '')
-        if '最後更新日期：' in ts:
-            ts = ts.replace('最後更新日期：', '')
-        if '發佈日期：' in ts:
-            ts = ts.replace('發佈日期：', '')
-        return datetime.strptime(ts, '%Y-%m-%d %H:%M')
-
-    @staticmethod
-    def _get_source(paragraph):
-        src = paragraph[-2]
-        if '（' in src or '）' in src:
-            src = src[1:-1].split('、')
-        else:
-            src = ''
-        return src
-
-    @staticmethod
-    def _zip_tags(tag_ids, tag_names):
-        cleaned_tag_ids = [int(id.split('/')[-1])
-                           for id in tag_ids if 'javascript' not in id]
-        return dict(zip(cleaned_tag_ids, tag_names))
-
     def start_requests(self):
         # TODO: Get last crawler ID
         # r = redis.StrictRedis(host=os.environ['REDIS_HOST'], port=6379, db=0)
         # start_id = int(r.get('HK01_LAST_CRAWL_ID'))
         # end_id = start_id + 5
-        start_id = 0
-        end_id = 160000
+        start_id = 143850
+        end_id =  143860
         for artical_id in range(start_id, end_id):
             url = ARTICAL_URL.format(artical_id)
             yield scrapy.Request(url=url, callback=self.parse)
 
     def parse(self, response):
-        try:
-            channel = unquote(response.url.split('/')[3])
-            artical_id = response.url.split('/')[4]
-        except:
-            channel = ''
-            artical_id = 0
 
-        try:
-            title = response.css('div.article_tit h1::text').extract_first().replace(u'\u3000', u'')
-        except:
-            title = ""
+        # Extract CSS
+        channel = unquote(response.url.split('/')[3])
+        artical_id = response.url.split('/')[4]
+        title = utils.extract_title(response.css('div.article_tit h1::text').extract_first())
+        editors = utils.extract_editors(response.css('div.editor::text').extract())
+        release_ts = utils.extract_release_ts(response.css('div.date::text').extract()[0])
+        last_updated_ts = utils.extract_last_update_ts(response.css('div.date::text').extract()[1])
+        abstract = utils.extract_abstract(response.css('li.article_summary_pt h2::text').extract_first())
+        paragraph = utils.extract_paragraph(response.css('p::text').extract())
+        tag_names = utils.extract_tag_names(response.css('div.tag_txt h4::text').extract())
+        tag_ids = utils.extract_tag_ids(response.css('div.tag_txt a[href]::attr(href)').extract())
+        tags = utils.zip_tags(tag_ids, tag_names)
+        sources = utils.extract_sources(response.css('p::text').extract())
 
-        try:
-            editors = []
-            for editor in response.css('div.editor::text').extract():
-                editors.append(editor.replace('撰文：', '').replace('\t', '').replace('\n', ''))
-        except:
-            editors = []
+        # Add article item
+        '''
+        article = ItemLoader(item=Hk01Item(), response=response)
 
-        try:
-            ts = response.css('div.date::text').extract()
-            release_ts = self._clean_ts(ts[0])
-            last_updated_ts = self._clean_ts(ts[1])
-        except:
-            release_ts = None
-            last_updated_ts = None
-
-        try:
-            abstract = response.css('li.article_summary_pt h2::text').extract_first().replace(u'\u3000', u'')
-        except:
-            abstract = ''
-
-        try:
-            paragraph = '\n'.join(response.css('p::text').extract())
-        except:
-            paragraph = []
-
-        try:
-            tag_ids = self._clean_tag_ids(response.css('div.tag_txt a[href]::attr(href)').extract())
-        except:
-            tag_ids = []
-
-        try:
-            tag_names = response.css('div.tag_txt h4::text').extract()
-        except:
-            tag_names = []
-
-        try:
-            tags = self._zip_tags(response.css('div.tag_txt a[href]::attr(href)').extract(
-            ), response.css('div.tag_txt h4::text').extract())
-        except:
-            tags = []
-
-        try:
-            sources = self._get_source(response.selector.xpath(
-                '/html/body/section/div[2]/div[1]/div[1]/section[2]').xpath('.//p/text()').extract())
-        except:
-            sources = []
+        article.add_value('article_id', artical_id)
+        article.add_value('channel', channel)
+        article.add_value('title', title)
+        article.add_value('editor', editors)
+        article.add_value('release_ts', release_ts)
+        article.add_value('abstract', abstract)       
+        article.add_value('paragraph', paragraph)
+        article.add_value('tag_ids', tag_ids)
+        article.add_value('tag_names', tag_names)
+        article.add_value('tags', tags)
+        article.add_value('spider_ts', int(time.time()))
+        article.add_value('sources', sources)
+        article.add_value('last_updated_ts', last_updated_ts)
+        article.add_value('url', ARTICAL_URL.format(artical_id))
+        '''
 
         item = {
-            'url': str(response.url),
-            'article_id': int(artical_id),
-            'title': str(title),
-            'channel': str(channel),
-            'editors': editors,
-            'release_ts': str(release_ts.strftime('%Y-%m-%d %H:%M')),
-            'last_updated_ts': str(last_updated_ts.strftime('%Y-%m-%d %H:%M')),
-            'abstract': str(abstract),
-            'paragraph': str(paragraph),
-            'tag_ids': tag_ids,
-            'tag_names': tag_names,
-            'tags': tags,
-            'spider_ts': int(datetime.now().timestamp() * 1000),
-            'sources': sources
+                'article_id': artical_id,
+                'channel': channel,
+                'title': title,
+                'editor': editors,
+                'release_ts': release_ts,
+                'abstract': abstract,
+                'paragraph': paragraph,
+                'tag_ids': tag_ids,
+                'tag_names': tag_names,
+                'tags': tags,
+                'spider_ts': int(time.time()),
+                'sources': sources,
+                'last_updated_ts': last_updated_ts,
+                'url': ARTICAL_URL.format(artical_id),
         }
+
         yield item
