@@ -6,6 +6,7 @@
 # See: https://doc.scrapy.org/en/latest/topics/item-pipeline.html
 
 import os
+import sys
 from datetime import datetime
 import json
 
@@ -23,17 +24,31 @@ class Hk01Pipeline(object):
         spider.last_id = self.redis.get("HK01_LAST_ID")
 
     def process_item(self, item, spider):
+        self._local_storage(item)
+        return item
+
+    def close_spider(self, spider):
+        pass
+
+    def _s3fs(self, item):
         self.redis.set("HK01_LAST_CRAWL_ID", int(item.get("article_id")))
         key = "HK01/dt={dt}/{article_id}.json".format_map(
             {'dt': datetime.strptime(item.get('release_ts'), '%Y-%m-%d %H:%M').strftime('%Y-%m-%d'),
              'article_id': item.get('article_id')})
         self.s3.Bucket("comma-fs").put_object(
             ACL='bucket-owner-full-control',
-            Body=json.dumps(item, ensure_ascii=False).encode(),
+            Body=json.dumps(item, ensure_ascii=False, sort_keys=True).encode(),
             Key=key,
             StorageClass='STANDARD'
         )
-        return item
 
-    def close_spider(self, spider):
-        pass
+    def _local_storage(self, item):
+        local_dir = "local_fs/HK01/dt={dt}/".format_map(
+            {'dt': datetime.strptime(item.get('release_ts'), '%Y-%m-%d %H:%M').strftime('%Y-%m-%d')})
+        if not os.path.isdir(local_dir):
+            os.makedirs(local_dir, mode=0o777)
+        local_path = local_dir + "{article_id}.json".format_map(
+            {'dt': datetime.strptime(item.get('release_ts'), '%Y-%m-%d %H:%M').strftime('%Y-%m-%d'),
+             'article_id': item.get('article_id')})
+        with open(local_path, 'w') as w:
+            w.write(json.dumps(item, ensure_ascii=False, sort_keys=True))

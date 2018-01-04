@@ -47,10 +47,11 @@ class Hk01Spider(scrapy.Spider):
 
     def start_requests(self):
         # TODO: Get last crawler ID
-        r = redis.StrictRedis(host=os.environ['REDIS_HOST'], port=6379, db=0)
-        start_id = int(r.get('HK01_LAST_CRAWL_ID')) - 5
-        end_id = start_id + 5
-
+        # r = redis.StrictRedis(host=os.environ['REDIS_HOST'], port=6379, db=0)
+        # start_id = int(r.get('HK01_LAST_CRAWL_ID'))
+        # end_id = start_id + 5
+        start_id = 0
+        end_id = 160000
         for artical_id in range(start_id, end_id):
             url = ARTICAL_URL.format(artical_id)
             yield scrapy.Request(url=url, callback=self.parse)
@@ -107,7 +108,7 @@ class Hk01Spider(scrapy.Spider):
             tags = self._zip_tags(response.css('div.tag_txt a[href]::attr(href)').extract(
             ), response.css('div.tag_txt h4::text').extract())
         except:
-            tags = {}
+            tags = []
 
         try:
             sources = self._get_source(response.selector.xpath(
@@ -116,19 +117,19 @@ class Hk01Spider(scrapy.Spider):
             sources = []
 
         item = {
-            'url': response.url,
-            'article_id': artical_id,
-            'title': title,
-            'channel': channel,
+            'url': str(response.url),
+            'article_id': int(artical_id),
+            'title': str(title),
+            'channel': str(channel),
             'editors': editors,
-            'release_ts': release_ts.strftime('%Y-%m-%d %H:%M'),
-            'last_updated_ts': last_updated_ts.strftime('%Y-%m-%d %H:%M'),
-            'abstract': abstract,
-            'paragraph': paragraph,
+            'release_ts': str(release_ts.strftime('%Y-%m-%d %H:%M')),
+            'last_updated_ts': str(last_updated_ts.strftime('%Y-%m-%d %H:%M')),
+            'abstract': str(abstract),
+            'paragraph': str(paragraph),
             'tag_ids': tag_ids,
             'tag_names': tag_names,
             'tags': tags,
-            'spider_ts': datetime.now().timestamp(),
-            'source': sources
+            'spider_ts': int(datetime.now().timestamp() * 1000),
+            'sources': sources
         }
         yield item
