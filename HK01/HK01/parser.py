@@ -71,7 +71,6 @@ def extract_tag_names(tag_names_css):
 
 
 def extract_title(title_css):
-    # if channel in ['01%E5%BD%B1%E5%83%8F']:
     try:
         title = title_css.replace(u'\u3000', u'')
     except:
@@ -91,6 +90,16 @@ def extract_release_ts(ts):
 def extract_last_update_ts(ts):
     try:
         last_update_ts = ts[1].replace('\t', '').replace('\n', '').replace('最後更新日期：', '')
+        release_ts = ts.replace('\t', '').replace('\n', '').replace('發佈日期：', '')
+        ts = datetime.strptime(release_ts, '%Y-%m-%d %H:%M').replace(tzinfo=HKT).astimezone(UTC).timestamp()
+    except:
+        ts = 0
+    return int(ts)
+
+
+def extract_last_update_ts(ts):
+    try:
+        last_update_ts = ts.replace('\t', '').replace('\n', '').replace('最後更新日期：', '')
         ts = datetime.strptime(last_update_ts, '%Y-%m-%d %H:%M').replace(tzinfo=HKT).astimezone(UTC).timestamp()
     except:
         ts = 0
