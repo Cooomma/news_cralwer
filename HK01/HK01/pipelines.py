@@ -19,11 +19,11 @@ class Hk01Pipeline(object):
 
     def __init__(self):
         # self.s3 = boto3.resource('s3')
-        # self.redis = redis.StrictRedis(host=os.environ['REDIS_HOST'], port=6379, db=0)
+        self.redis = redis.StrictRedis(host=os.environ['REDIS_HOST'], port=6379, db=0)
         pass
 
     def open_spider(self, spider):
-        # spider.last_id = self.redis.get("HK01_LAST_ID")
+        spider.last_id = self.redis.get("HK01_LAST_CRAWL_ID")
         pass
 
     def process_item(self, item, spider):
@@ -34,7 +34,7 @@ class Hk01Pipeline(object):
         pass
 
     def _s3fs(self, item):
-        # self.redis.set("HK01_LAST_CRAWL_ID", int(item.get("article_id")))
+        self.redis.set("HK01_LAST_CRAWL_ID", int(item.get("article_id")))
         '''
         key = "HK01/dt={dt}/{article_id}.json".format_map(
             {'dt': datetime.strptime(item.get('release_ts'), '%Y-%m-%d %H:%M').strftime('%Y-%m-%d'),
