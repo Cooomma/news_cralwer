@@ -56,5 +56,5 @@ class Hk01Pipeline(object):
         local_path = local_dir + "{article_id}.json".format_map(
             {'dt': parser.ts_to_timestr(item.get('release_ts')),
              'article_id': item.get('article_id')})
-        with open(local_path, 'w') as w:
+        with open(local_path, 'w', encoding='utf-8') as w:
             w.write(json.dumps(item, ensure_ascii=False, sort_keys=True))
