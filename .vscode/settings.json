@@ -1,0 +1,5 @@
+{
+    "python.autoComplete.extraPaths": [
+        "${workspaceRoot}/HK01/HK01/"
+    ],
+}

@@ -39,7 +39,7 @@ class Hk01Pipeline(object):
         self.redis.set("HK01_LAST_CRAWL_ID", int(item.get("article_id")))
 
         key = "HK01/dt={dt}/{article_id}.json".format_map(
-            {'dt': datetime.strptime(item.get('release_ts'), '%Y-%m-%d %H:%M').strftime('%Y-%m-%d'),
+            {'dt': parser.ts_to_timestr(item.get('release_ts')),
              'article_id': item.get('article_id')})
         self.s3.Bucket(self.s3_bucket).put_object(
             ACL='bucket-owner-full-control',
