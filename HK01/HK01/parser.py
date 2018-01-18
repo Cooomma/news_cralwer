@@ -103,7 +103,6 @@ def extract_last_update_ts(ts):
         ts = 0
     return int(ts)
 
-
 def extract_last_update_ts(ts):
     try:
         last_update_ts = ts.replace('\t', '').replace('\n', '').replace('最後更新日期：', '')
@@ -131,4 +130,5 @@ def extract_textRank(text, topK=20):
     result = []
     for word in jieba.analyse.textrank(text, topK=topK, withWeight=False, allowPOS=('n', 'vn', 'v')):
         result.append(word)
+        
     return result

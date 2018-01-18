@@ -13,7 +13,7 @@ from scrapy.loader import ItemLoader
 from HK01 import parser
 from HK01.items import Hk01Item
 
-ARTICAL_URL = 'https://www.hk01.com/article/{}'
+ARTICLE_URL = 'https://www.hk01.com/article/{}'
 
 
 class Hk01Spider(scrapy.Spider):
@@ -25,9 +25,10 @@ class Hk01Spider(scrapy.Spider):
         start_id = int(r.get('HK01_LAST_CRAWL_ID'))
         end_id = start_id + 10
 
-        for artical_id in range(start_id, end_id):
-            url = ARTICAL_URL.format(artical_id)
-            yield scrapy.Request(url=url, callback=self.parse)
+        for article_id in range(start_id, end_id):
+            if article_id % 3 = 0:
+                url = ARTICLE_URL.format(article_id)
+                yield scrapy.Request(url=url, callback=self.parse)
 
     def parse(self, response):
 
