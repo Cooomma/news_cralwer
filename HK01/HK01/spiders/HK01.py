@@ -26,7 +26,7 @@ class Hk01Spider(scrapy.Spider):
         end_id = start_id + 10
 
         for article_id in range(start_id, end_id):
-            if article_id % 3 = 0:
+            if article_id % 3 == 0:
                 url = ARTICLE_URL.format(article_id)
                 yield scrapy.Request(url=url, callback=self.parse)
 
@@ -71,7 +71,7 @@ class Hk01Spider(scrapy.Spider):
                 'paragraph_keyword':paragraph_keyword,
                 'paragraph_tr':paragraph_tr,
                 'last_updated_ts': last_updated_ts,
-                'url': ARTICAL_URL.format(article_id),
+                'url': ARTICLE_URL.format(article_id),
         }
 
         yield item
