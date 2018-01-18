@@ -4,6 +4,7 @@ from dateutil import tz
 
 import os
 import time
+import re
 import redis
 import scrapy
 from scrapy.loader import ItemLoader
@@ -25,15 +26,15 @@ class Hk01Spider(scrapy.Spider):
         # end_id = start_id + 5
         start_id = 63529
         end_id =  63530
-        for artical_id in range(start_id, end_id):
-            url = ARTICAL_URL.format(artical_id)
+        for article_id in range(start_id, end_id):
+            url = ARTICAL_URL.format(article_id)
             yield scrapy.Request(url=url, callback=self.parse)
 
     def parse(self, response):
 
         # Extract CSS
         channel = unquote(response.url.split('/')[3])
-        artical_id = response.url.split('/')[4]
+        article_id = parser.extract_article_id(response.url)
         title = parser.extract_title(response.css('div.article_tit h1::text').extract_first())
         editors = parser.extract_editors(response.css('div.editor::text').extract())
         release_ts = parser.extract_release_ts(response.css('div.date::text').extract()[0])
@@ -44,6 +45,11 @@ class Hk01Spider(scrapy.Spider):
         tag_ids = parser.extract_tag_ids(response.css('div.tag_txt a[href]::attr(href)').extract())
         tags = parser.zip_tags(tag_ids, tag_names)
         sources = parser.extract_sources(response.css('p::text').extract())
+
+        abstract_keyword = parser.extract_keywords(abstract)
+        abstract_tr = parser.extract_textRank(abstract, topK=5)
+        paragraph_keyword = parser.extract_keywords(paragraph)
+        paragraph_tr = parser.extract_textRank(paragraph)
 
         # Add article item
         '''
@@ -66,7 +72,7 @@ class Hk01Spider(scrapy.Spider):
         '''
 
         item = {
-                'article_id': artical_id,
+                'article_id': article_id,
                 'channel': channel,
                 'title': title,
                 'editor': editors,
@@ -78,8 +84,12 @@ class Hk01Spider(scrapy.Spider):
                 'tags': tags,
                 'spider_ts': int(time.time()),
                 'sources': sources,
+                'abstract_keyword': abstract_keyword,
+                'abstract_tr':abstract_tr,
+                'paragraph_keyword':paragraph_keyword,
+                'paragraph_tr':paragraph_tr,
                 'last_updated_ts': last_updated_ts,
-                'url': ARTICAL_URL.format(artical_id),
+                'url': ARTICAL_URL.format(article_id),
         }
 
         yield item

@@ -2,6 +2,9 @@ from datetime import datetime
 from dateutil import tz
 import re
 
+import jieba
+import jieba.analyse    
+
 HKT = tz.gettz('Asia/Hong_Kong')
 UTC = tz.gettz('UTC')
 
@@ -11,6 +14,11 @@ def extract_abstract(abstract_css):
     except:
         abstract = ""
     return abstract
+
+def extract_article_id(url):
+    for i in url.split('/'):
+        if re.match(r'\d+', i):
+            return int(i)
 
 def extract_editors(src_editors):
     try:
@@ -88,3 +96,17 @@ def zip_tags(tag_ids, tag_names):
 
 def ts_to_timestr(ts):
     return datetime.fromtimestamp(int(ts)).replace(tzinfo=UTC).astimezone(HKT).strftime('%Y-%m-%d')
+
+
+# TF-IDF Keyword Extraction
+def extract_keywords(text):
+    result = []
+    for word in jieba.analyse.extract_tags(text,withWeight=False, allowPOS=('n', 'vn', 'v')):
+        result.append(word)
+    return result
+
+def extract_textRank(text, topK=20):
+    result = []
+    for word in jieba.analyse.textrank(text, topK=topK, withWeight=False, allowPOS=('n', 'vn', 'v')):
+        result.append(word)
+    return result
