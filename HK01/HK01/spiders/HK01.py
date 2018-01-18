@@ -23,6 +23,9 @@ class Hk01Spider(scrapy.Spider):
         r = redis.StrictRedis(host=os.environ['REDIS_HOST'], port=6379, db=0)
         start_id = int(r.get('HK01_LAST_CRAWL_ID'))
         end_id = start_id + 5
+        # start_id = 0
+        # end_id = 150000
+
         for artical_id in range(start_id, end_id):
             url = ARTICAL_URL.format(artical_id)
             yield scrapy.Request(url=url, callback=self.parse)
