@@ -18,35 +18,35 @@ from HK01 import parser
 class Hk01Pipeline(object):
 
     def __init__(self):
-        # self.s3 = boto3.resource('s3')
-        # self.redis = redis.StrictRedis(host=os.environ['REDIS_HOST'], port=6379, db=0)
+        self.s3 = boto3.resource('s3')
+        self.redis = redis.StrictRedis(host=os.environ['REDIS_HOST'], port=6379, db=0)
+        self.s3_bucket = os.environ['S3_BUCKET']
         pass
 
     def open_spider(self, spider):
-        # spider.last_id = self.redis.get("HK01_LAST_ID")
+        spider.last_id = self.redis.get("HK01_LAST_CRAWL_ID")
         pass
 
     def process_item(self, item, spider):
         self._local_storage(item)
+        self._s3fs(item)
         return item
 
     def close_spider(self, spider):
         pass
 
     def _s3fs(self, item):
-        # self.redis.set("HK01_LAST_CRAWL_ID", int(item.get("article_id")))
-        '''
+        self.redis.set("HK01_LAST_CRAWL_ID", int(item.get("article_id")))
+
         key = "HK01/dt={dt}/{article_id}.json".format_map(
             {'dt': datetime.strptime(item.get('release_ts'), '%Y-%m-%d %H:%M').strftime('%Y-%m-%d'),
              'article_id': item.get('article_id')})
-        self.s3.Bucket("comma-fs").put_object(
+        self.s3.Bucket(self.s3_bucket).put_object(
             ACL='bucket-owner-full-control',
             Body=json.dumps(item, ensure_ascii=False, sort_keys=True).encode(),
             Key=key,
             StorageClass='STANDARD'
         )
-        '''
-        self._local_storage(item)
 
     def _local_storage(self, item):
         local_dir = "local_fs/HK01/dt={dt}/".format_map(

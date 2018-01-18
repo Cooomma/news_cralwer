@@ -103,3 +103,4 @@ ENV/
 # Custom
 .DS_Store
 start.sh
+HK01/local_fs/*
