@@ -26,9 +26,8 @@ class Hk01Spider(scrapy.Spider):
         end_id = start_id + 10
 
         for article_id in range(start_id, end_id):
-            if article_id % 3 == 0:
-                url = ARTICLE_URL.format(article_id)
-                yield scrapy.Request(url=url, callback=self.parse)
+            url = ARTICLE_URL.format(article_id)
+            yield scrapy.Request(url=url, callback=self.parse)
 
     def parse(self, response):
 

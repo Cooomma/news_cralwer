@@ -13,7 +13,7 @@ BOT_NAME = 'HK01'
 
 SPIDER_MODULES = ['HK01.spiders']
 NEWSPIDER_MODULE = 'HK01.spiders'
-
+LOG_LEVEL = 'INFO'
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 #USER_AGENT = 'HK01 (+http://www.yourdomain.com)'
