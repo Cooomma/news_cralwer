@@ -22,8 +22,8 @@ class Hk01Spider(scrapy.Spider):
     def start_requests(self):
         # TODO: Get last crawler ID
         r = redis.StrictRedis(host=os.environ['REDIS_HOST'], port=6379, db=0)
-        start_id = int(r.get('HK01_LAST_CRAWL_ID'))
-        end_id = start_id + 10
+        start_id = int(r.get('HK01_LAST_CRAWL_ID')) - 100
+        end_id = start_id + 100
 
         for article_id in range(start_id, end_id):
             url = ARTICLE_URL.format(article_id)
