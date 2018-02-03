@@ -49,7 +49,7 @@ class Hk01Pipeline(object):
         )
 
     def _local_storage(self, item):
-        local_dir = "local_fs/HK01/dt={dt}/".format_map(
+        local_dir = "/data/news-raw/HK01/dt={dt}/".format_map(
             {'dt': parser.ts_to_timestr(item.get('release_ts'))})
         if not os.path.isdir(local_dir):
             os.makedirs(local_dir, mode=0o777)
