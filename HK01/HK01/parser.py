@@ -1,9 +1,9 @@
-from datetime import datetime
-from dateutil import tz
 import re
+from datetime import datetime
 
 import jieba
-import jieba.analyse    
+import jieba.analyse
+from dateutil import tz
 
 HKT = tz.gettz('Asia/Hong_Kong')
 UTC = tz.gettz('UTC')
@@ -16,10 +16,10 @@ def extract_abstract(abstract_css):
         abstract = ""
     return abstract
 
+
 def extract_article_id(url):
-    for i in url.split('/'):
-        if re.match(r'\d+', i):
-            return int(i)
+    return int(re.findall(r'\/(\d+)\/', url)[0])
+
 
 def extract_editors(src_editors):
     try:
@@ -103,6 +103,7 @@ def extract_last_update_ts(ts):
         ts = 0
     return int(ts)
 
+
 def extract_last_update_ts(ts):
     try:
         last_update_ts = ts.replace('\t', '').replace('\n', '').replace('最後更新日期：', '')
@@ -120,15 +121,18 @@ def ts_to_timestr(ts):
     return datetime.fromtimestamp(int(ts)).replace(tzinfo=UTC).astimezone(HKT).strftime('%Y-%m-%d')
 
 # TF-IDF Keyword Extraction
+
+
 def extract_keywords(text):
     result = []
-    for word in jieba.analyse.extract_tags(text,withWeight=False, allowPOS=('n', 'vn', 'v')):
+    for word in jieba.analyse.extract_tags(text, withWeight=False, allowPOS=('n', 'vn', 'v')):
         result.append(word)
     return result
+
 
 def extract_textRank(text, topK=20):
     result = []
     for word in jieba.analyse.textrank(text, topK=topK, withWeight=False, allowPOS=('n', 'vn', 'v')):
         result.append(word)
-        
+
     return result

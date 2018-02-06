@@ -5,42 +5,47 @@
 # Don't forget to add your pipeline to the ITEM_PIPELINES setting
 # See: https://doc.scrapy.org/en/latest/topics/item-pipeline.html
 
-import os
-import sys
-from datetime import datetime
+import gzip
 import json
+import logging
+import os
 
 import boto3
 import redis
-from HK01 import parser
+
+from HK01 import database, parser
+from HK01.database import HK01Progress
+
+logger = logging.getLogger()
 
 
 class Hk01Pipeline(object):
 
     def __init__(self):
         self.s3 = boto3.resource('s3')
-        self.redis = redis.StrictRedis(host=os.environ['REDIS_HOST'], port=6379, db=0)
         self.s3_bucket = os.environ['S3_BUCKET']
-        pass
+        self.redis = redis.StrictRedis(host=os.environ['REDIS_HOST'], port=6379, db=0)
+        engine, meta = database.new_engine_and_metadata()
+        self.table = HK01Progress(engine, meta)
 
     def open_spider(self, spider):
-        spider.last_id = self.redis.get("HK01_LAST_CRAWL_ID")
         pass
 
     def process_item(self, item, spider):
         self._local_storage(item)
-        self._s3fs(item)
+        dt, idx = self._get_dt_and_id(item)
+        if not self.is_crawled_article(dt, item):
+            self._local_gzip(item)
+            self._s3fs(item)
         return item
 
     def close_spider(self, spider):
         pass
 
     def _s3fs(self, item):
-        self.redis.set("HK01_LAST_CRAWL_ID", int(item.get("article_id")))
-
+        dt, article_id = self._get_dt_and_id(item)
         key = "HK01/dt={dt}/{article_id}.json".format_map(
-            {'dt': parser.ts_to_timestr(item.get('release_ts')),
-             'article_id': item.get('article_id')})
+            {'dt': dt, 'article_id': article_id})
         self.s3.Bucket(self.s3_bucket).put_object(
             ACL='bucket-owner-full-control',
             Body=json.dumps(item, ensure_ascii=False, sort_keys=True).encode(),
@@ -49,12 +54,44 @@ class Hk01Pipeline(object):
         )
 
     def _local_storage(self, item):
+        dt, article_id = self._get_dt_and_id(item)
         local_dir = "/data/news-raw/HK01/dt={dt}/".format_map(
-            {'dt': parser.ts_to_timestr(item.get('release_ts'))})
-        if not os.path.isdir(local_dir):
-            os.makedirs(local_dir, mode=0o777)
+            {'dt': dt})
+        os.makedirs(local_dir, mode=0o777, exist_ok=True)
         local_path = local_dir + "{article_id}.json".format_map(
-            {'dt': parser.ts_to_timestr(item.get('release_ts')),
-             'article_id': item.get('article_id')})
+            {'dt': dt, 'article_id': article_id})
         with open(local_path, 'w', encoding='utf-8') as w:
             w.write(json.dumps(item, ensure_ascii=False, sort_keys=True))
+        self.redis.set("HK01_LAST_CRAWL_ID", int(article_id))
+        self.table.insert_article_progress(article_id, local_path)
+
+    def _local_gzip(self, item):
+        dt, article_id = self._get_dt_and_id(item)
+        local_dir = "/data/news-etl/HK01/dt={}/".format(dt)
+        os.makedirs(local_dir, mode=0o777, exist_ok=True)
+        gz_file = local_dir + 'articles.gz'
+        gz = gzip.GzipFile(gz_file, mode='ab')
+        gz.write(json.dumps(item, ensure_ascii=False, sort_keys=True).encode())
+        gz.write(b'\n')
+        gz.close()
+        logger.info('{article_id} is written in {gz_file}'.format_map({
+            'article_id': article_id,
+            'gz_file': gz_file
+        }))
+
+    @staticmethod
+    def is_crawled_article(dt, article_id):
+        # TODO: Use DB to save it instead of local fs cache
+        raw_file = "/data/news-raw/HK01/dt={dt}/{article_id}.json".format_map(
+            {'dt': dt, 'article_id': article_id})
+        if os.path.isfile(raw_file):
+            logger.info('{} is existed.'.format_map(article_id))
+            return True
+        else:
+            return False
+
+    @staticmethod
+    def _get_dt_and_id(item):
+        dt = parser.ts_to_timestr(item.get('release_ts'))
+        idx = item.get('article_id')
+        return dt, idx

@@ -1,33 +1,39 @@
-from urllib.parse import unquote
-from datetime import datetime
-from dateutil import tz
-
+import logging
 import os
-import time
 import re
+import time
+from datetime import datetime
+from urllib.parse import unquote
+
 import redis
 import scrapy
+from dateutil import tz
 from scrapy.loader import ItemLoader
-
 
 from HK01 import parser
 from HK01.items import Hk01Item
+from HK01.validators import Validators
 
 ARTICLE_URL = 'https://www.hk01.com/article/{}'
+logger = logging.getLogger()
 
 
 class Hk01Spider(scrapy.Spider):
     name = 'HK01'
 
+    def __init__(self):
+        self.redis = redis.StrictRedis(host=os.environ['REDIS_HOST'], port=6379, db=0)
+        self.validator = Validators()
+
     def start_requests(self):
         # TODO: Get last crawler ID
-        r = redis.StrictRedis(host=os.environ['REDIS_HOST'], port=6379, db=0)
-        start_id = int(r.get('HK01_LAST_CRAWL_ID')) - 100
+        start_id = int(self.redis.get('HK01_LAST_CRAWL_ID')) - 100
         end_id = start_id + 100
 
         for article_id in range(start_id, end_id):
             url = ARTICLE_URL.format(article_id)
-            yield scrapy.Request(url=url, callback=self.parse)
+            if not self.validator.check(article_id):
+                yield scrapy.Request(url=url, callback=self.parse)
 
     def parse(self, response):
 
@@ -53,24 +59,24 @@ class Hk01Spider(scrapy.Spider):
         # Add article item
 
         item = {
-                'article_id': article_id,
-                'channel': channel,
-                'title': title,
-                'editor': editors,
-                'release_ts': release_ts,
-                'abstract': abstract,
-                'paragraph': paragraph,
-                'tag_ids': tag_ids,
-                'tag_names': tag_names,
-                'tags': tags,
-                'spider_ts': int(time.time()),
-                'sources': sources,
-                'abstract_keyword': abstract_keyword,
-                'abstract_tr':abstract_tr,
-                'paragraph_keyword':paragraph_keyword,
-                'paragraph_tr':paragraph_tr,
-                'last_updated_ts': last_updated_ts,
-                'url': ARTICLE_URL.format(article_id),
+            'article_id': article_id,
+            'channel': channel,
+            'title': title,
+            'editor': editors,
+            'release_ts': release_ts,
+            'abstract': abstract,
+            'paragraph': paragraph,
+            'tag_ids': tag_ids,
+            'tag_names': tag_names,
+            'tags': tags,
+            'spider_ts': int(time.time()),
+            'sources': sources,
+            'abstract_keyword': abstract_keyword,
+            'abstract_tr': abstract_tr,
+            'paragraph_keyword': paragraph_keyword,
+            'paragraph_tr': paragraph_tr,
+            'last_updated_ts': last_updated_ts,
+            'url': ARTICLE_URL.format(article_id),
         }
 
         yield item
