@@ -52,6 +52,12 @@ class Hk01Pipeline(object):
             Key=key,
             StorageClass='STANDARD'
         )
+        logger.info("Upload {article_id} to s3://{bucket}/{key}".format_map({'article_id': article_id, 'bucket': self.s3_bucket, 'key': key}))
+
+        key = "news/HK01/dt={}/article.gz".format(dt)
+        local_path = "/data/news-etl/HK01/dt={}/articles.gz"
+        s3.meta.client.upload_file(local_path, 'comma-etl', key)
+        logger.info("Upload {key} to s3://comma-etl/{key}".format_map({'key': key}))
 
     def _local_storage(self, item):
         dt, article_id = self._get_dt_and_id(item)
