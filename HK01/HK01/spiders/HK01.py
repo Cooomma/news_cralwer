@@ -28,7 +28,7 @@ class Hk01Spider(scrapy.Spider):
     def start_requests(self):
         # TODO: Get last crawler ID
         start_id = int(self.redis.get('HK01_LAST_CRAWL_ID')) - 100
-        end_id = start_id + 100
+        end_id = start_id + 300
 
         for article_id in range(start_id, end_id):
             url = ARTICLE_URL.format(article_id)
