@@ -22,12 +22,11 @@ class Hk01Spider(scrapy.Spider):
     name = 'HK01'
 
     def __init__(self):
-        self.redis = redis.StrictRedis(host=os.environ['REDIS_HOST'], port=6379, db=0)
         self.validator = Validators()
 
     def start_requests(self):
         # TODO: Get last crawler ID
-        start_id = int(self.redis.get('HK01_LAST_CRAWL_ID')) - 100
+        start_id = self.validator.get_last_article_id()
         end_id = start_id + 300
 
         for article_id in range(start_id, end_id):

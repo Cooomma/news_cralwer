@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+import configparser
 
 import sqlalchemy
 from sqlalchemy import INT, TIMESTAMP, Boolean, Column, String, Table, func
@@ -9,6 +10,7 @@ from sqlalchemy.schema import MetaData
 from sqlalchemy.sql.expression import delete, insert, text, update
 
 logger = logging.getLogger()
+CONFIG_PATH = os.path.expanduser('~/.secret/credentials')
 
 
 class BaseModel(object):
@@ -23,29 +25,19 @@ class BaseModel(object):
 
 
 def new_engine_and_metadata(db_conf=None):
+    if os.path.isfile(CONFIG_PATH):
+        config = configparser.ConfigParser()
+        config.read(CONFIG_PATH)
+        db_conf = dict(config['db'])
+    else:
+        raise FileNotFoundError
     settings = {
         'max_overflow': -1,
         'pool_size': 8,
         'pool_recycle': 1024,
         'pool_timeout': 800,
     }
-    if db_conf is None:
-        db_conf = {
-            'host': os.environ["MYSQL_DATABASE_HOST"],
-            'port': os.environ["MYSQL_DATABASE_PORT"],
-            'username': os.environ["MYSQL_DATABASE_USERNAME"],
-            'password': os.environ["MYSQL_DATABASE_PASSWORD"],
-            'db_name': os.environ["MYSQL_DATABASE_NAME"],
-        }
-
-    db_connection_str = 'mysql://{}:{}@{}:{}/{}'.format(
-        db_conf['username'],
-        db_conf['password'],
-        db_conf['host'],
-        db_conf['port'],
-        db_conf['db_name']
-    )
-
+    db_connection_str = 'mysql://{username}:{password}@{host}:{port}/{db_name}'.format_map(db_conf)
     engine = sqlalchemy.create_engine(db_connection_str, **settings)
     metadata = MetaData(bind=engine)
 
@@ -80,3 +72,16 @@ class HK01Progress(BaseModel):
         stmt = text(
             'INSERT INTO hk01_progress (article_id, crawl_ts, path) VALUES ({article_id}, {crawl_ts}, "{path}") ON DUPLICATE KEY UPDATE article_id = {article_id}'.format_map(row))
         self.execute(stmt)
+
+    def get_all_article_ids(self):
+        stmt = text('SELECT distinct(article_id) FROM hk01_progress ORDER BY article_id ASC')
+        cursor = self.execute(stmt)
+        row = cursor.fetchone()
+        while row:
+            yield row[0]
+            row = cursor.fetchone()
+
+    def get_last_crawled_article_id(self):
+        stmt = text('SELECT distinct(article_id) FROM hk01_progress ORDER BY article_id DESC LIMIT 1')
+        cursor = self.execute(stmt)
+        return cursor.fetchone()[0]

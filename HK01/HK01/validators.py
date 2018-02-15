@@ -27,3 +27,9 @@ class Validators(object):
     def check(self, article_id):
         self.article_id = article_id
         return bool(self._is_article_existed_in_db() & self._is_article_existed_in_local_fs())
+
+    def get_last_article_id(self):
+        return self.table.get_last_crawled_article_id()
+
+    def get_all_article_ids(self):
+        return self.table.get_all_article_ids()
